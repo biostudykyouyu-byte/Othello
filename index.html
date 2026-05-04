@@ -25,6 +25,69 @@
     const apiKey = "AIzaSyCVa346V3leNADh3bqeCIdFKfXJhXbm6AM";
 
     // ==========================================
+    // ジャンルとレベルの定義
+    // ==========================================
+    const GENRES = {
+      kanji: { id: 'kanji', label: '漢字の読み', promptItem: '漢字（熟語や単語）', promptMeaning: 'ひらがなでの読み方', quizQuestion: 'この漢字の読み方は？' },
+      english: { id: 'english', label: '英単語', promptItem: '英単語', promptMeaning: '日本語訳', quizQuestion: 'この英単語の意味は？' },
+      element: { id: 'element', label: '元素記号', promptItem: '元素名（例: 水素、鉄）', promptMeaning: '元素記号（例: H, Fe）', quizQuestion: 'この元素の記号は？' },
+      capital: { id: 'capital', label: '世界の首都', promptItem: '国名', promptMeaning: 'その国の首都名', quizQuestion: 'この国の首都は？' },
+      history: { id: 'history', label: '歴史の年号', promptItem: '日本史や世界史の出来事（例: 大化の改新）', promptMeaning: '西暦の年号（数字と「年」のみ。例: 645年）', quizQuestion: 'この出来事が起きた年号は？' },
+      idiom: { id: 'idiom', label: '四字熟語', promptItem: '四字熟語', promptMeaning: 'その意味（簡潔に）', quizQuestion: 'この四字熟語の意味は？' },
+      math: { id: 'math', label: '計算問題', promptItem: '計算式（例: 12 × 3、150 ÷ 5 など）', promptMeaning: 'その答えの数値', quizQuestion: 'この計算の答えは？' },
+      prefecture: { id: 'prefecture', label: '県庁所在地', promptItem: '日本の都道府県名', promptMeaning: 'その県庁所在地名（市など）', quizQuestion: 'この都道府県の県庁所在地は？' },
+      free: { id: 'free', label: 'その他 (自由作成)', promptItem: 'キーワード（短め）', promptMeaning: 'その意味や関連する答え', quizQuestion: 'このキーワードの答え・意味は？' }
+    };
+
+    const LEVELS = {
+      kanji: [
+        { label: '初級 (漢検5級〜4級)', value: '漢検5級から漢検4級レベル' },
+        { label: '中級 (漢検3級〜準2級)', value: '漢検3級から漢検準2級レベル' },
+        { label: '上級 (漢検2級〜準1級)', value: '漢検2級から漢検準1級レベル' }
+      ],
+      english: [
+        { label: '初級 (英検4級)', value: '英検4級レベル' },
+        { label: '中級 (英検3級)', value: '英検3級レベル' },
+        { label: '上級 (英検準2級)', value: '英検準2級レベル' }
+      ],
+      element: [
+        { label: '初級 (有名な元素)', value: '中学理科で習う有名な元素' },
+        { label: '中級 (標準的な元素)', value: '高校化学で習う元素' },
+        { label: '上級 (マニアックな元素)', value: '周期表のマイナーな元素' }
+      ],
+      capital: [
+        { label: '初級 (有名な国)', value: '世界的に有名な主要国の首都' },
+        { label: '中級 (標準的な国)', value: 'ニュースでよく聞く国の首都' },
+        { label: '上級 (マニアックな国)', value: '少しマイナーな国の首都' }
+      ],
+      history: [
+        { label: '初級 (中学歴史)', value: '中学歴史で必ず習う重要な出来事' },
+        { label: '中級 (高校日本史)', value: '高校日本史の標準レベルの出来事' },
+        { label: '上級 (難関大レベル)', value: '大学受験レベルのやや細かい出来事' }
+      ],
+      idiom: [
+        { label: '初級 (よく使う四字熟語)', value: '日常会話でよく使われる四字熟語' },
+        { label: '中級 (標準的な四字熟語)', value: '漢検3級程度の標準的な四字熟語' },
+        { label: '上級 (難関な四字熟語)', value: '漢検2級以上のやや難しい四字熟語' }
+      ],
+      math: [
+        { label: '初級 (簡単な計算)', value: '九九や2桁の簡単な足し算・引き算' },
+        { label: '中級 (2桁の掛け算など)', value: '2桁×1桁や簡単な割り算' },
+        { label: '上級 (複雑な計算)', value: '2桁×2桁や少し複雑な四則演算' }
+      ],
+      prefecture: [
+        { label: '初級 (北海道・関東など)', value: '北海道や関東地方、近畿地方の都道府県' },
+        { label: '中級 (県名と異なる)', value: '都道府県名と県庁所在地名が異なる県' },
+        { label: '上級 (全国ランダム)', value: '日本全国の都道府県からランダム' }
+      ],
+      free: [
+        { label: '初級 (有名・基本)', value: '誰でも知っている有名なレベル' },
+        { label: '中級 (標準的)', value: '一般的な知識レベル' },
+        { label: '上級 (マニアック)', value: '知る人ぞ知るマニアックなレベル' }
+      ]
+    };
+
+    // ==========================================
     // API呼び出し関数群
     // ==========================================
     const fetchWithRetry = async (url, options, retries = 5) => {
@@ -46,16 +109,24 @@
       }
     };
 
-    const generateThemeWords = async (genre, level, customTheme) => {
+    const generateThemeWords = async (genreId, level, customTheme) => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      const itemType = genre === 'kanji' ? '漢字（熟語や単語）' : '英単語';
-      const meaningDesc = genre === 'kanji' ? 'ひらがなでの読み方' : '日本語訳';
-      const themeDesc = customTheme && customTheme.trim() ? `「${customTheme.trim()}」に関連する` : `難易度が「${level}」の`;
+      const genreInfo = GENRES[genreId];
+      const itemType = genreInfo.promptItem;
+      const meaningDesc = genreInfo.promptMeaning;
       
-      const prompt = `テーマ: ${themeDesc}${itemType}をできるだけ多く（最大64個）生成してください。
+      let themeDesc = "";
+      if (genreId === 'free') {
+        const userTheme = customTheme && customTheme.trim() ? customTheme.trim() : "一般的な雑学や常識";
+        themeDesc = `「${userTheme}」に関するクイズ（難易度: ${level}）`;
+      } else {
+        themeDesc = customTheme && customTheme.trim() ? `「${customTheme.trim()}」に関連する` : `難易度が「${level}」の`;
+      }
+      
+      const prompt = `テーマ: ${themeDesc}${genreId === 'free' ? 'のキーワードと答えのペア' : itemType}をできるだけ多く（最大64個）生成してください。
 難易度に応じて1から5のポイントを付けてください（1:簡単〜5:難しい）。
 出力は "words" というキーを持つJSONオブジェクトとし、その中に配列として以下のプロパティを持つ要素を含めてください:
-- word (${itemType})
+- word (${genreId === 'free' ? 'マスに表示する問題キーワード。※数文字程度の短い単語にすること' : itemType})
 - meaning (${meaningDesc})
 - points (1から5の整数)`;
 
@@ -97,91 +168,185 @@
       }
       
       const parsedData = JSON.parse(text);
-      return parsedData.words || []; // 配列部分を返す（空の場合は空配列）
+      return parsedData.words || [];
     };
 
     // ==========================================
     // デフォルトデータ (AI生成失敗時の予備データ)
     // ==========================================
     const DEFAULT_KANJI_DATA = [
-      { word: "過程", meaning: "かてい", points: 1 },
-      { word: "傾向", meaning: "けいこう", points: 1 },
-      { word: "責任", meaning: "せきにん", points: 1 },
-      { word: "資源", meaning: "しげん", points: 1 },
-      { word: "豊富", meaning: "ほうふ", points: 1 },
-      { word: "評価", meaning: "ひょうか", points: 1 },
-      { word: "伝統", meaning: "でんとう", points: 1 },
-      { word: "摩擦", meaning: "まさつ", points: 2 },
-      { word: "披露", meaning: "ひろう", points: 2 },
-      { word: "脅威", meaning: "きょうい", points: 2 },
-      { word: "把握", meaning: "はあく", points: 2 },
-      { word: "妥協", meaning: "だきょう", points: 2 },
-      { word: "貢献", meaning: "こうけん", points: 2 },
-      { word: "錯覚", meaning: "さっかく", points: 2 },
-      { word: "顕著", meaning: "けんちょ", points: 3 },
-      { word: "普遍", meaning: "ふへん", points: 3 },
-      { word: "俊敏", meaning: "しゅんびん", points: 3 },
-      { word: "匿名", meaning: "とくめい", points: 3 },
-      { word: "逸話", meaning: "いつわ", points: 3 },
-      { word: "偏見", meaning: "へんけん", points: 3 },
-      { word: "辛辣", meaning: "しんらつ", points: 4 },
-      { word: "語彙", meaning: "ごい", points: 4 },
-      { word: "曖昧", meaning: "あいまい", points: 4 },
-      { word: "傲慢", meaning: "ごうまん", points: 4 },
-      { word: "隠蔽", meaning: "いんぺい", points: 4 },
-      { word: "凄惨", meaning: "せいさん", points: 4 },
-      { word: "忖度", meaning: "そんたく", points: 5 },
-      { word: "脆弱", meaning: "ぜいじゃく", points: 5 },
-      { word: "蔓延", meaning: "まんえん", points: 5 },
-      { word: "喧噪", meaning: "けんそう", points: 5 },
-      { word: "乖離", meaning: "かいり", points: 5 },
-      { word: "躊躇", meaning: "ちゅうちょ", points: 5 }
+      { word: "過程", meaning: "かてい", points: 1 }, { word: "傾向", meaning: "けいこう", points: 1 },
+      { word: "責任", meaning: "せきにん", points: 1 }, { word: "資源", meaning: "しげん", points: 1 },
+      { word: "豊富", meaning: "ほうふ", points: 1 }, { word: "評価", meaning: "ひょうか", points: 1 },
+      { word: "伝統", meaning: "でんとう", points: 1 }, { word: "摩擦", meaning: "まさつ", points: 2 },
+      { word: "披露", meaning: "ひろう", points: 2 }, { word: "脅威", meaning: "きょうい", points: 2 },
+      { word: "把握", meaning: "はあく", points: 2 }, { word: "妥協", meaning: "だきょう", points: 2 },
+      { word: "貢献", meaning: "こうけん", points: 2 }, { word: "錯覚", meaning: "さっかく", points: 2 },
+      { word: "顕著", meaning: "けんちょ", points: 3 }, { word: "普遍", meaning: "ふへん", points: 3 },
+      { word: "俊敏", meaning: "しゅんびん", points: 3 }, { word: "匿名", meaning: "とくめい", points: 3 },
+      { word: "逸話", meaning: "いつわ", points: 3 }, { word: "偏見", meaning: "へんけん", points: 3 },
+      { word: "辛辣", meaning: "しんらつ", points: 4 }, { word: "語彙", meaning: "ごい", points: 4 },
+      { word: "曖昧", meaning: "あいまい", points: 4 }, { word: "傲慢", meaning: "ごうまん", points: 4 },
+      { word: "隠蔽", meaning: "いんぺい", points: 4 }, { word: "凄惨", meaning: "せいさん", points: 4 },
+      { word: "忖度", meaning: "そんたく", points: 5 }, { word: "脆弱", meaning: "ぜいじゃく", points: 5 },
+      { word: "蔓延", meaning: "まんえん", points: 5 }, { word: "喧噪", meaning: "けんそう", points: 5 },
+      { word: "乖離", meaning: "かいり", points: 5 }, { word: "躊躇", meaning: "ちゅうちょ", points: 5 }
     ];
 
     const DEFAULT_ENGLISH_DATA = [
-      { word: "answer", meaning: "答える", points: 1 },
-      { word: "bring", meaning: "持ってくる", points: 1 },
-      { word: "catch", meaning: "捕まえる", points: 1 },
-      { word: "draw", meaning: "描く", points: 1 },
-      { word: "fall", meaning: "落ちる", points: 1 },
-      { word: "clear", meaning: "晴れた", points: 1 },
-      { word: "remember", meaning: "思い出す", points: 2 },
-      { word: "borrow", meaning: "借りる", points: 2 },
-      { word: "collect", meaning: "集める", points: 2 },
-      { word: "follow", meaning: "従う", points: 2 },
-      { word: "invite", meaning: "招待する", points: 2 },
-      { word: "careful", meaning: "注意深い", points: 2 },
-      { word: "create", meaning: "創造する", points: 3 },
-      { word: "discuss", meaning: "議論する", points: 3 },
-      { word: "expect", meaning: "期待する", points: 3 },
-      { word: "guess", meaning: "推測する", points: 3 },
-      { word: "dangerous", meaning: "危険な", points: 3 },
-      { word: "impossible", meaning: "不可能な", points: 3 },
-      { word: "accept", meaning: "受け入れる", points: 4 },
-      { word: "compare", meaning: "比較する", points: 4 },
-      { word: "destroy", meaning: "破壊する", points: 4 },
-      { word: "express", meaning: "表現する", points: 4 },
-      { word: "expensive", meaning: "高価な", points: 4 },
-      { word: "familiar", meaning: "よく知られた", points: 4 },
-      { word: "announce", meaning: "発表する", points: 5 },
-      { word: "complain", meaning: "不平を言う", points: 5 },
-      { word: "graduate", meaning: "卒業する", points: 5 },
-      { word: "recognize", meaning: "認識する", points: 5 },
-      { word: "complicated", meaning: "複雑な", points: 5 },
-      { word: "independent", meaning: "独立した", points: 5 }
+      { word: "answer", meaning: "答える", points: 1 }, { word: "bring", meaning: "持ってくる", points: 1 },
+      { word: "catch", meaning: "捕まえる", points: 1 }, { word: "draw", meaning: "描く", points: 1 },
+      { word: "fall", meaning: "落ちる", points: 1 }, { word: "clear", meaning: "晴れた", points: 1 },
+      { word: "remember", meaning: "思い出す", points: 2 }, { word: "borrow", meaning: "借りる", points: 2 },
+      { word: "collect", meaning: "集める", points: 2 }, { word: "follow", meaning: "従う", points: 2 },
+      { word: "invite", meaning: "招待する", points: 2 }, { word: "careful", meaning: "注意深い", points: 2 },
+      { word: "create", meaning: "創造する", points: 3 }, { word: "discuss", meaning: "議論する", points: 3 },
+      { word: "expect", meaning: "期待する", points: 3 }, { word: "guess", meaning: "推測する", points: 3 },
+      { word: "dangerous", meaning: "危険な", points: 3 }, { word: "impossible", meaning: "不可能な", points: 3 },
+      { word: "accept", meaning: "受け入れる", points: 4 }, { word: "compare", meaning: "比較する", points: 4 },
+      { word: "destroy", meaning: "破壊する", points: 4 }, { word: "express", meaning: "表現する", points: 4 },
+      { word: "expensive", meaning: "高価な", points: 4 }, { word: "familiar", meaning: "よく知られた", points: 4 },
+      { word: "announce", meaning: "発表する", points: 5 }, { word: "complain", meaning: "不平を言う", points: 5 },
+      { word: "graduate", meaning: "卒業する", points: 5 }, { word: "recognize", meaning: "認識する", points: 5 },
+      { word: "complicated", meaning: "複雑な", points: 5 }, { word: "independent", meaning: "独立した", points: 5 }
     ];
 
-    const KANJI_LEVELS = [
-      { label: '初級 (漢検5級〜4級)', value: '漢検5級から漢検4級レベル' },
-      { label: '中級 (漢検3級〜準2級)', value: '漢検3級から漢検準2級レベル' },
-      { label: '上級 (漢検2級〜準1級)', value: '漢検2級から漢検準1級レベル' }
+    const DEFAULT_ELEMENT_DATA = [
+      { word: "水素", meaning: "H", points: 1 }, { word: "ヘリウム", meaning: "He", points: 1 },
+      { word: "炭素", meaning: "C", points: 1 }, { word: "窒素", meaning: "N", points: 1 },
+      { word: "酸素", meaning: "O", points: 1 }, { word: "ナトリウム", meaning: "Na", points: 1 },
+      { word: "マグネシウム", meaning: "Mg", points: 1 }, { word: "アルミニウム", meaning: "Al", points: 2 },
+      { word: "ケイ素", meaning: "Si", points: 2 }, { word: "リン", meaning: "P", points: 2 },
+      { word: "硫黄", meaning: "S", points: 2 }, { word: "塩素", meaning: "Cl", points: 2 },
+      { word: "カリウム", meaning: "K", points: 2 }, { word: "カルシウム", meaning: "Ca", points: 2 },
+      { word: "鉄", meaning: "Fe", points: 3 }, { word: "銅", meaning: "Cu", points: 3 },
+      { word: "亜鉛", meaning: "Zn", points: 3 }, { word: "銀", meaning: "Ag", points: 3 },
+      { word: "金", meaning: "Au", points: 3 }, { word: "白金", meaning: "Pt", points: 3 },
+      { word: "水銀", meaning: "Hg", points: 4 }, { word: "鉛", meaning: "Pb", points: 4 },
+      { word: "チタン", meaning: "Ti", points: 4 }, { word: "ニッケル", meaning: "Ni", points: 4 },
+      { word: "コバルト", meaning: "Co", points: 4 }, { word: "ヨウ素", meaning: "I", points: 4 },
+      { word: "ウラン", meaning: "U", points: 5 }, { word: "プルトニウム", meaning: "Pu", points: 5 },
+      { word: "タングステン", meaning: "W", points: 5 }, { word: "リチウム", meaning: "Li", points: 5 }
     ];
 
-    const ENGLISH_LEVELS = [
-      { label: '初級 (英検4級)', value: '英検4級レベル' },
-      { label: '中級 (英検3級)', value: '英検3級レベル' },
-      { label: '上級 (英検準2級)', value: '英検準2級レベル' }
+    const DEFAULT_CAPITAL_DATA = [
+      { word: "日本", meaning: "東京", points: 1 }, { word: "アメリカ", meaning: "ワシントンD.C.", points: 1 },
+      { word: "イギリス", meaning: "ロンドン", points: 1 }, { word: "フランス", meaning: "パリ", points: 1 },
+      { word: "ドイツ", meaning: "ベルリン", points: 1 }, { word: "イタリア", meaning: "ローマ", points: 1 },
+      { word: "中国", meaning: "北京", points: 1 }, { word: "韓国", meaning: "ソウル", points: 1 },
+      { word: "ロシア", meaning: "モスクワ", points: 2 }, { word: "カナダ", meaning: "オタワ", points: 2 },
+      { word: "オーストラリア", meaning: "キャンベラ", points: 2 }, { word: "ブラジル", meaning: "ブラジリア", points: 2 },
+      { word: "インド", meaning: "ニューデリー", points: 2 }, { word: "エジプト", meaning: "カイロ", points: 2 },
+      { word: "タイ", meaning: "バンコク", points: 3 }, { word: "フィリピン", meaning: "マニラ", points: 3 },
+      { word: "インドネシア", meaning: "ジャカルタ", points: 3 }, { word: "ベトナム", meaning: "ハノイ", points: 3 },
+      { word: "メキシコ", meaning: "メキシコシティ", points: 3 }, { word: "アルゼンチン", meaning: "ブエノスアイレス", points: 3 },
+      { word: "トルコ", meaning: "アンカラ", points: 4 }, { word: "イラン", meaning: "テヘラン", points: 4 },
+      { word: "サウジアラビア", meaning: "リヤド", points: 4 }, { word: "南アフリカ", meaning: "プレトリア", points: 4 },
+      { word: "ケニア", meaning: "ナイロビ", points: 4 }, { word: "ナイジェリア", meaning: "アブジャ", points: 5 },
+      { word: "ペルー", meaning: "リマ", points: 5 }, { word: "チリ", meaning: "サンティアゴ", points: 5 },
+      { word: "スイス", meaning: "ベルン", points: 5 }, { word: "オランダ", meaning: "アムステルダム", points: 5 }
     ];
+
+    const DEFAULT_HISTORY_DATA = [
+      { word: "大化の改新", meaning: "645年", points: 1 }, { word: "白村江の戦い", meaning: "663年", points: 1 },
+      { word: "壬申の乱", meaning: "672年", points: 1 }, { word: "平城京遷都", meaning: "710年", points: 1 },
+      { word: "平安京遷都", meaning: "794年", points: 1 }, { word: "鎌倉幕府成立", meaning: "1185年", points: 1 },
+      { word: "鉄砲伝来", meaning: "1543年", points: 1 }, { word: "キリスト教伝来", meaning: "1549年", points: 1 },
+      { word: "関ヶ原の戦い", meaning: "1600年", points: 2 }, { word: "江戸幕府成立", meaning: "1603年", points: 2 },
+      { word: "大政奉還", meaning: "1867年", points: 2 }, { word: "明治維新", meaning: "1868年", points: 2 },
+      { word: "日清戦争", meaning: "1894年", points: 2 }, { word: "日露戦争", meaning: "1904年", points: 2 },
+      { word: "第一次世界大戦", meaning: "1914年", points: 3 }, { word: "満州事変", meaning: "1931年", points: 3 },
+      { word: "日中戦争", meaning: "1937年", points: 3 }, { word: "太平洋戦争開戦", meaning: "1941年", points: 3 },
+      { word: "ポツダム宣言受諾", meaning: "1945年", points: 3 }, { word: "サンフランシスコ条約", meaning: "1951年", points: 4 },
+      { word: "日ソ共同宣言", meaning: "1956年", points: 4 }, { word: "日韓基本条約", meaning: "1965年", points: 4 },
+      { word: "沖縄返還", meaning: "1972年", points: 4 }, { word: "日中平和友好条約", meaning: "1978年", points: 4 },
+      { word: "消費税導入", meaning: "1989年", points: 5 }, { word: "湾岸戦争", meaning: "1991年", points: 5 },
+      { word: "同時多発テロ", meaning: "2001年", points: 5 }, { word: "東日本大震災", meaning: "2011年", points: 5 },
+      { word: "新型コロナ流行", meaning: "2020年", points: 5 }
+    ];
+
+    const DEFAULT_IDIOM_DATA = [
+      { word: "一期一会", meaning: "一生に一度の出会い", points: 1 }, { word: "十人十色", meaning: "人それぞれ好みや性質が違うこと", points: 1 },
+      { word: "以心伝心", meaning: "言葉に出さなくても心が通じ合うこと", points: 1 }, { word: "一石二鳥", meaning: "一つの行為で二つの利益を得ること", points: 1 },
+      { word: "温故知新", meaning: "昔の事をたずねて新しい知識を得ること", points: 1 }, { word: "花鳥風月", meaning: "自然の美しい景色のこと", points: 1 },
+      { word: "自画自賛", meaning: "自分で自分を褒めること", points: 2 }, { word: "臨機応変", meaning: "状況に合わせて適切な対応をすること", points: 2 },
+      { word: "一喜一憂", meaning: "状況が変わるたびに喜んだり心配したりすること", points: 2 }, { word: "四面楚歌", meaning: "周りが敵だらけで孤立していること", points: 2 },
+      { word: "試行錯誤", meaning: "色々な方法を試して失敗を重ねながら解決に近づくこと", points: 2 }, { word: "本末転倒", meaning: "根本的なことと些細なことを取り違えること", points: 3 },
+      { word: "言語道断", meaning: "言葉で言い表せないほどとんでもないこと", points: 3 }, { word: "自業自得", meaning: "自分の悪い行いの報いを自分で受けること", points: 3 },
+      { word: "前代未聞", meaning: "今まで聞いたことがないような大変なこと", points: 3 }, { word: "有名無実", meaning: "名前だけで実質が伴っていないこと", points: 3 },
+      { word: "画竜点睛", meaning: "物事を完成させるための最後の大事な仕上げ", points: 4 }, { word: "捲土重来", meaning: "一度敗れた者が勢いを盛り返してくること", points: 4 },
+      { word: "呉越同舟", meaning: "仲の悪い者同士が同じ場所にいること", points: 4 }, { word: "切磋琢磨", meaning: "仲間同士で励まし合いながら向上すること", points: 4 },
+      { word: "傍若無人", meaning: "周りを気にせず勝手気ままに振る舞うこと", points: 4 }, { word: "天衣無縫", meaning: "自然でわざとらしくなく、美しいこと", points: 5 },
+      { word: "荒唐無稽", meaning: "根拠がなく、でたらめなこと", points: 5 }, { word: "乾坤一擲", meaning: "運命をかけて大きな勝負に出ること", points: 5 },
+      { word: "牽強附会", meaning: "道理に合わないことを無理にこじつけること", points: 5 }, { word: "虚心坦懐", meaning: "先入観を持たず、素直な心でいること", points: 5 }
+    ];
+
+    const DEFAULT_MATH_DATA = [
+      { word: "7 + 5", meaning: "12", points: 1 }, { word: "15 - 8", meaning: "7", points: 1 },
+      { word: "4 × 6", meaning: "24", points: 1 }, { word: "9 × 9", meaning: "81", points: 1 },
+      { word: "36 ÷ 6", meaning: "6", points: 1 }, { word: "45 ÷ 9", meaning: "5", points: 1 },
+      { word: "12 + 19", meaning: "31", points: 2 }, { word: "40 - 15", meaning: "25", points: 2 },
+      { word: "12 × 5", meaning: "60", points: 2 }, { word: "15 × 3", meaning: "45", points: 2 },
+      { word: "80 ÷ 4", meaning: "20", points: 2 }, { word: "64 ÷ 4", meaning: "16", points: 2 },
+      { word: "35 + 47", meaning: "82", points: 3 }, { word: "100 - 58", meaning: "42", points: 3 },
+      { word: "18 × 4", meaning: "72", points: 3 }, { word: "25 × 4", meaning: "100", points: 3 },
+      { word: "120 ÷ 5", meaning: "24", points: 3 }, { word: "144 ÷ 12", meaning: "12", points: 3 },
+      { word: "15 × 12", meaning: "180", points: 4 }, { word: "24 × 5", meaning: "120", points: 4 },
+      { word: "360 ÷ 15", meaning: "24", points: 4 }, { word: "256 ÷ 16", meaning: "16", points: 4 },
+      { word: "99 + 123", meaning: "222", points: 4 }, { word: "305 - 198", meaning: "107", points: 4 },
+      { word: "23 × 11", meaning: "253", points: 5 }, { word: "45 × 15", meaning: "675", points: 5 },
+      { word: "512 ÷ 16", meaning: "32", points: 5 }, { word: "1024 ÷ 32", meaning: "32", points: 5 },
+      { word: "1/2 + 1/4", meaning: "3/4", points: 5 }, { word: "1 - 1/3", meaning: "2/3", points: 5 }
+    ];
+
+    const DEFAULT_PREFECTURE_DATA = [
+      { word: "北海道", meaning: "札幌市", points: 1 }, { word: "青森県", meaning: "青森市", points: 1 },
+      { word: "秋田県", meaning: "秋田市", points: 1 }, { word: "山形県", meaning: "山形市", points: 1 },
+      { word: "福島県", meaning: "福島市", points: 1 }, { word: "千葉県", meaning: "千葉市", points: 1 },
+      { word: "新潟県", meaning: "新潟市", points: 1 }, { word: "富山県", meaning: "富山市", points: 1 },
+      { word: "福井県", meaning: "福井市", points: 1 }, { word: "長野県", meaning: "長野市", points: 1 },
+      { word: "静岡県", meaning: "静岡市", points: 1 }, { word: "岐阜県", meaning: "岐阜市", points: 1 },
+      { word: "京都府", meaning: "京都市", points: 1 }, { word: "大阪府", meaning: "大阪市", points: 1 },
+      { word: "奈良県", meaning: "奈良市", points: 1 }, { word: "和歌山県", meaning: "和歌山市", points: 1 },
+      { word: "鳥取県", meaning: "鳥取市", points: 1 }, { word: "広島県", meaning: "広島市", points: 1 },
+      { word: "岩手県", meaning: "盛岡市", points: 3 }, { word: "宮城県", meaning: "仙台市", points: 3 },
+      { word: "茨城県", meaning: "水戸市", points: 3 }, { word: "栃木県", meaning: "宇都宮市", points: 3 },
+      { word: "群馬県", meaning: "前橋市", points: 3 }, { word: "埼玉県", meaning: "さいたま市", points: 2 },
+      { word: "神奈川県", meaning: "横浜市", points: 3 }, { word: "石川県", meaning: "金沢市", points: 4 },
+      { word: "山梨県", meaning: "甲府市", points: 4 }, { word: "愛知県", meaning: "名古屋市", points: 3 },
+      { word: "三重県", meaning: "津市", points: 5 }, { word: "滋賀県", meaning: "大津市", points: 4 },
+      { word: "兵庫県", meaning: "神戸市", points: 3 }, { word: "島根県", meaning: "松江市", points: 5 },
+      { word: "岡山県", meaning: "岡山市", points: 1 }, { word: "山口県", meaning: "山口市", points: 1 },
+      { word: "徳島県", meaning: "徳島市", points: 1 }, { word: "香川県", meaning: "高松市", points: 4 },
+      { word: "愛媛県", meaning: "松山市", points: 4 }, { word: "高知県", meaning: "高知市", points: 1 },
+      { word: "福岡県", meaning: "福岡市", points: 1 }, { word: "佐賀県", meaning: "佐賀市", points: 1 },
+      { word: "長崎県", meaning: "長崎市", points: 1 }, { word: "熊本県", meaning: "熊本市", points: 1 },
+      { word: "大分県", meaning: "大分市", points: 1 }, { word: "宮崎県", meaning: "宮崎市", points: 1 },
+      { word: "鹿児島県", meaning: "鹿児島市", points: 1 }, { word: "沖縄県", meaning: "那覇市", points: 3 }
+    ];
+
+    const DEFAULT_FREE_DATA = [
+      { word: "富士山", meaning: "日本一高い山", points: 1 }, { word: "太平洋", meaning: "世界一広い海", points: 1 },
+      { word: "ナイル川", meaning: "世界一長い川", points: 2 }, { word: "バチカン", meaning: "世界一面積が小さい国", points: 3 },
+      { word: "ロシア", meaning: "世界一面積が大きい国", points: 1 }, { word: "エベレスト", meaning: "世界一高い山", points: 2 },
+      { word: "琵琶湖", meaning: "日本一大きい湖", points: 1 }, { word: "信濃川", meaning: "日本一長い川", points: 2 },
+      { word: "青函トンネル", meaning: "日本一長い海底トンネル", points: 4 }, { word: "東京スカイツリー", meaning: "日本一高い建造物", points: 1 },
+      { word: "サハラ砂漠", meaning: "世界一広い砂漠", points: 2 }, { word: "カスピ海", meaning: "世界一大きい湖", points: 3 },
+      { word: "バイカル湖", meaning: "世界一深い湖", points: 4 }, { word: "アマゾン川", meaning: "世界最大の流域面積の川", points: 2 },
+      { word: "ユーラシア", meaning: "地球で一番大きな大陸", points: 3 }
+    ];
+
+    const FALLBACK_DATA = {
+      kanji: DEFAULT_KANJI_DATA,
+      english: DEFAULT_ENGLISH_DATA,
+      element: DEFAULT_ELEMENT_DATA,
+      capital: DEFAULT_CAPITAL_DATA,
+      history: DEFAULT_HISTORY_DATA,
+      idiom: DEFAULT_IDIOM_DATA,
+      math: DEFAULT_MATH_DATA,
+      prefecture: DEFAULT_PREFECTURE_DATA,
+      free: DEFAULT_FREE_DATA
+    };
 
     const DIRECTIONS = [
       [-1, -1], [-1, 0], [-1, 1],
@@ -254,11 +419,9 @@
       
       candidates.forEach(item => {
         let score = 0;
-        // 読み仮名/意味の文字数が近いものを優先
         const lengthDiff = Math.abs(item.meaning.length - correctItem.meaning.length);
         score -= lengthDiff * 5; 
         
-        // 単語の文字数が近いものを優先
         const wordLengthDiff = Math.abs(item.word.length - correctItem.word.length);
         score -= wordLengthDiff * 3;
         
@@ -287,31 +450,42 @@
       const [currentPlayer, setCurrentPlayer] = useState('black');
       
       // メニュー設定用
-      const [genre, setGenre] = useState('kanji'); // 'kanji' | 'english'
-      const [level, setLevel] = useState(KANJI_LEVELS[0].value);
+      const [genre, setGenre] = useState('kanji'); 
+      const [level, setLevel] = useState(LEVELS['kanji'][0].value);
       const [currentGenre, setCurrentGenre] = useState('kanji'); // プレイ中のジャンル
       const [currentThemeName, setCurrentThemeName] = useState("");
 
-      const [themeInput, setThemeInput] = useState(""); // 追加: 自由入力用の状態変数を定義
+      const [themeInput, setThemeInput] = useState(""); 
       const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
       const [quizModal, setQuizModal] = useState(null); 
       const [toastMessage, setToastMessage] = useState("");
 
-      // ジャンル変更時にレベルの選択肢をリセット
+      // ジャンル変更時にレベルの選択肢と自由入力をリセット
       useEffect(() => {
-        if (genre === 'kanji') {
-          setLevel(KANJI_LEVELS[0].value);
-        } else {
-          setLevel(ENGLISH_LEVELS[0].value);
-        }
-        setThemeInput(""); // ジャンル変更時は自由入力もリセット
+        setLevel(LEVELS[genre][0].value);
+        setThemeInput(""); 
       }, [genre]);
+
+      const getPlaceholder = (g) => {
+        switch (g) {
+          case 'kanji': return "自由入力 (例: 動物, 四字熟語)";
+          case 'english': return "自由入力 (例: IT, 宇宙)";
+          case 'element': return "自由入力 (例: 金属, ハロゲン)";
+          case 'capital': return "自由入力 (例: アジア, ヨーロッパ)";
+          case 'history': return "自由入力 (例: 戦国時代, 江戸時代)";
+          case 'idiom': return "自由入力 (例: 数字を含む, 動物を含む)";
+          case 'math': return "自由入力 (例: 掛け算, 分数)";
+          case 'prefecture': return "自由入力 (例: 九州地方, 関東地方)";
+          case 'free': return "自由入力 (例: アニメキャラ, プログラミング)";
+          default: return "自由入力";
+        }
+      };
 
       const initializeBoard = (wordDataList, targetGenre) => {
         setPlayMode(menuMode);
         setCurrentGenre(targetGenre);
         
-        const fallbackData = targetGenre === 'kanji' ? DEFAULT_KANJI_DATA : DEFAULT_ENGLISH_DATA;
+        const fallbackData = FALLBACK_DATA[targetGenre];
         let shuffledData = [...wordDataList].sort(() => Math.random() - 0.5);
         
         // 足りない分はフォールバックデータから補充
@@ -345,14 +519,14 @@
         try {
           const words = await generateThemeWords(genre, level, themeInput);
           const isCustom = themeInput.trim().length > 0;
-          const levelLabel = isCustom ? themeInput.trim() : (genre === 'kanji' ? KANJI_LEVELS : ENGLISH_LEVELS).find(l => l.value === level).label;
-          setCurrentThemeName(`✨ ${genre === 'kanji' ? '漢字' : '英単語'} - ${levelLabel}`);
+          const levelLabel = isCustom ? themeInput.trim() : LEVELS[genre].find(l => l.value === level).label;
+          setCurrentThemeName(`✨ ${GENRES[genre].label} - ${levelLabel}`);
           initializeBoard(words, genre);
         } catch (error) {
           console.error("Theme generation error:", error);
           alert("AIの生成に失敗しました。予備の標準データで開始します。");
-          setCurrentThemeName(`標準データ (${genre === 'kanji' ? '漢字' : '英単語'})`);
-          initializeBoard(genre === 'kanji' ? DEFAULT_KANJI_DATA : DEFAULT_ENGLISH_DATA, genre);
+          setCurrentThemeName(`標準データ (${GENRES[genre].label})`);
+          initializeBoard(FALLBACK_DATA[genre], genre);
         } finally {
           setIsGeneratingTheme(false);
         }
@@ -453,13 +627,15 @@
         return { black: blackScore, white: whiteScore };
       }, [board]);
 
+      const quizTitle = GENRES[currentGenre]?.quizQuestion || "この問題の答えは？";
+
       // メニュー画面
       if (gameState === 'menu') {
         return (
           <div className="min-h-screen bg-stone-100 flex flex-col items-center justify-center p-4 font-sans text-stone-800">
-            <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full border-4 border-stone-600">
-              <h1 className="text-4xl font-black text-center text-stone-900 mb-2">学習リバーシ</h1>
-              <p className="text-center text-stone-600 font-bold mb-8">遊びながら知識を高めよう！</p>
+            <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-2xl max-w-md w-full border-4 border-stone-600">
+              <h1 className="text-3xl sm:text-4xl font-black text-center text-stone-900 mb-2">学習リバーシ</h1>
+              <p className="text-center text-stone-600 font-bold mb-6">遊びながら知識を高めよう！</p>
               
               <div className="mb-6 flex justify-center gap-4 bg-stone-100 p-3 rounded-lg border-2 border-stone-300">
                 <label className="flex items-center cursor-pointer">
@@ -478,51 +654,46 @@
                 </label>
               </div>
 
-              <div className="bg-stone-50 p-6 rounded-2xl border-2 border-stone-200 mb-4">
+              <div className="bg-stone-50 p-4 sm:p-6 rounded-2xl border-2 border-stone-200 mb-4">
                 <h2 className="text-lg font-bold text-stone-800 mb-4 flex items-center justify-center gap-2">
                   <span className="text-2xl">✨</span> AI問題生成
                 </h2>
                 
                 <div className="mb-6">
                   <p className="font-bold text-stone-600 text-sm mb-2 text-center">ジャンルを選択</p>
-                  <div className="flex justify-center gap-6">
-                    <label className="flex items-center cursor-pointer">
-                      <input 
-                        type="radio" value="kanji" checked={genre === 'kanji'} onChange={() => setGenre('kanji')}
-                        className="mr-2 w-4 h-4 text-amber-600 focus:ring-amber-500"
-                      />
-                      <span className="font-bold text-stone-800">漢字</span>
-                    </label>
-                    <label className="flex items-center cursor-pointer">
-                      <input 
-                        type="radio" value="english" checked={genre === 'english'} onChange={() => setGenre('english')}
-                        className="mr-2 w-4 h-4 text-amber-600 focus:ring-amber-500"
-                      />
-                      <span className="font-bold text-stone-800">英単語</span>
-                    </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {Object.values(GENRES).map(g => (
+                      <label key={g.id} className={`flex items-center justify-center p-2 rounded-lg border cursor-pointer transition-colors ${genre === g.id ? 'bg-amber-100 border-amber-500' : 'bg-white border-stone-300 hover:bg-stone-50'}`}>
+                        <input 
+                          type="radio" value={g.id} checked={genre === g.id} onChange={() => setGenre(g.id)}
+                          className="hidden"
+                        />
+                        <span className={`font-bold text-xs sm:text-sm ${genre === g.id ? 'text-amber-800' : 'text-stone-700'}`}>{g.label}</span>
+                      </label>
+                    ))}
                   </div>
                 </div>
 
                 <div className="mb-6">
                   <p className="font-bold text-stone-600 text-sm mb-2 text-center">レベル・テーマを選択</p>
                   <div className="flex flex-col gap-2 items-center">
-                    {(genre === 'kanji' ? KANJI_LEVELS : ENGLISH_LEVELS).map(lvl => (
-                      <label key={lvl.value} className={`flex items-center cursor-pointer w-full max-w-[240px] p-2 rounded-lg border transition-colors ${!themeInput.trim() && level === lvl.value ? 'bg-amber-50 border-amber-400' : 'bg-white border-stone-300 hover:bg-stone-100'}`}>
+                    {LEVELS[genre].map(lvl => (
+                      <label key={lvl.value} className={`flex items-center cursor-pointer w-full max-w-[280px] p-2 rounded-lg border transition-colors ${!themeInput.trim() && level === lvl.value ? 'bg-amber-50 border-amber-400' : 'bg-white border-stone-300 hover:bg-stone-100'}`}>
                         <input 
                           type="radio" value={lvl.value} checked={!themeInput.trim() && level === lvl.value} onChange={(e) => {setLevel(e.target.value); setThemeInput("");}}
                           className="mr-2 w-4 h-4 text-amber-600 focus:ring-amber-500"
                         />
-                        <span className="font-bold text-stone-700 text-sm">{lvl.label}</span>
+                        <span className="font-bold text-stone-700 text-xs sm:text-sm">{lvl.label}</span>
                       </label>
                     ))}
                     
-                    <div className="w-full max-w-[240px] mt-2">
+                    <div className="w-full max-w-[280px] mt-2">
                       <input 
                         type="text" 
                         value={themeInput}
                         onChange={(e) => setThemeInput(e.target.value)}
-                        placeholder={genre === 'kanji' ? "自由入力 (例: 動物, 四字熟語)" : "自由入力 (例: IT, 宇宙)"}
-                        className={`w-full p-2 pl-3 text-sm font-bold text-stone-700 rounded-lg border-2 focus:outline-none transition-colors ${themeInput.trim() ? 'bg-amber-50 border-amber-400' : 'bg-white border-stone-300 focus:border-amber-400'}`}
+                        placeholder={getPlaceholder(genre)}
+                        className={`w-full p-2 pl-3 text-xs sm:text-sm font-bold text-stone-700 rounded-lg border-2 focus:outline-none transition-colors ${themeInput.trim() ? 'bg-amber-50 border-amber-400' : 'bg-white border-stone-300 focus:border-amber-400'}`}
                         disabled={isGeneratingTheme}
                       />
                     </div>
@@ -605,7 +776,7 @@
                       key={`${r}-${c}`}
                       onClick={() => handleCellClick(r, c)}
                       className={`
-                        bg-amber-600 aspect-square flex flex-col items-center justify-center relative select-none
+                        bg-amber-600 aspect-square flex flex-col items-center justify-center relative select-none overflow-hidden
                         ${!cell.owner && isValid ? 'cursor-pointer hover:bg-amber-500' : ''}
                       `}
                     >
@@ -614,7 +785,7 @@
                           <div className="absolute top-0.5 text-[8px] sm:text-[10px] text-amber-100 font-bold opacity-80">
                             {cell.points}pt
                           </div>
-                          <div className="text-[9px] sm:text-[11px] font-bold text-white text-center leading-tight truncate w-full px-0.5 break-words" style={{ textShadow: "1px 1px 1px rgba(0,0,0,0.4)" }}>
+                          <div className="text-[9px] sm:text-[11px] font-bold text-white text-center leading-tight w-full px-0.5" style={{ textShadow: "1px 1px 1px rgba(0,0,0,0.4)", wordBreak: "break-word" }}>
                             {cell.word}
                           </div>
                           {isValid && (
@@ -648,7 +819,7 @@
                     正解で {quizModal.wordObj.points}pt 獲得
                   </span>
                   <h2 className="text-stone-600 text-sm font-bold mb-1">
-                    {currentGenre === 'kanji' ? 'この漢字の読み方は？' : 'この英単語の意味は？'}
+                    {quizTitle}
                   </h2>
                   <div className="text-3xl sm:text-4xl font-black text-stone-900 break-words">{quizModal.wordObj.word}</div>
                 </div>
@@ -658,7 +829,7 @@
                     <button 
                       key={i}
                       onClick={() => handleQuizAnswer(opt)}
-                      className="p-4 bg-stone-50 hover:bg-stone-100 border-2 border-stone-300 hover:border-stone-500 text-stone-800 rounded-xl font-bold text-lg transition-all active:scale-95"
+                      className="p-3 sm:p-4 bg-stone-50 hover:bg-stone-100 border-2 border-stone-300 hover:border-stone-500 text-stone-800 rounded-xl font-bold text-sm sm:text-base transition-all active:scale-95 text-left break-words"
                     >
                       {opt}
                     </button>
