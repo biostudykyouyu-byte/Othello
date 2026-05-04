@@ -46,7 +46,7 @@
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
       const prompt = `テーマ「${theme}」に関連する英単語をちょうど64個生成してください。
 難易度に応じて1から5のポイントを付けてください（1:簡単〜5:難しい）。
-出力はJSON配列で、各要素は以下のプロパティを持つこと:
+出力は "words" というキーを持つJSONオブジェクトとし、その中に配列として以下のプロパティを持つ要素を含めてください:
 - word (英単語)
 - meaning (日本語訳)
 - pos (品詞: "noun", "verb", "adj" など)
@@ -57,17 +57,23 @@
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                word: { type: "STRING" },
-                meaning: { type: "STRING" },
-                pos: { type: "STRING" },
-                points: { type: "INTEGER" }
-              },
-              required: ["word", "meaning", "pos", "points"]
-            }
+            type: "OBJECT",
+            properties: {
+              words: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    word: { type: "STRING" },
+                    meaning: { type: "STRING" },
+                    pos: { type: "STRING" },
+                    points: { type: "INTEGER" }
+                  },
+                  required: ["word", "meaning", "pos", "points"]
+                }
+              }
+            },
+            required: ["words"]
           }
         }
       };
@@ -78,7 +84,8 @@
         body: JSON.stringify(payload)
       });
 
-      return JSON.parse(data.candidates[0].content.parts[0].text);
+      const parsedData = JSON.parse(data.candidates[0].content.parts[0].text);
+      return parsedData.words; // 配列部分を返す
     };
 
     // ==========================================
