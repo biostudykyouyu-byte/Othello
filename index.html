@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>漢字リバーシ by AI</title>
+  <title>学習リバーシ by AI</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & ReactDOM -->
@@ -42,14 +42,17 @@
       }
     };
 
-    const generateThemeWords = async (theme) => {
+    const generateThemeWords = async (genre, level, customTheme) => {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      const themeInstruction = theme.trim() ? `テーマ「${theme}」に関連する` : "ランダムなテーマ（例：四字熟語、動植物、自然、歴史などからAIが自由に決定）に関する";
-      const prompt = `${themeInstruction}漢字（熟語や単語）をちょうど64個生成してください。
-難易度（漢検の級などを考慮）に応じて1から5のポイントを付けてください（1:簡単〜5:難しい）。
+      const itemType = genre === 'kanji' ? '漢字（熟語や単語）' : '英単語';
+      const meaningDesc = genre === 'kanji' ? 'ひらがなでの読み方' : '日本語訳';
+      const themeDesc = customTheme && customTheme.trim() ? `「${customTheme.trim()}」に関連する` : `難易度が「${level}」の`;
+      
+      const prompt = `テーマ: ${themeDesc}${itemType}をちょうど64個生成してください。
+難易度に応じて1から5のポイントを付けてください（1:簡単〜5:難しい）。
 出力は "words" というキーを持つJSONオブジェクトとし、その中に配列として以下のプロパティを持つ要素を含めてください:
-- word (漢字・熟語)
-- meaning (ひらがなでの読み方)
+- word (${itemType})
+- meaning (${meaningDesc})
 - points (1から5の整数)`;
 
       const payload = {
@@ -88,93 +91,86 @@
     };
 
     // ==========================================
-    // デフォルトデータ (漢検5級〜準1級レベル)
+    // デフォルトデータ (AI生成失敗時の予備データ)
     // ==========================================
-    const DEFAULT_WORD_DATA = [
-      // 1pt (漢検5級・小6レベル程度)
+    const DEFAULT_KANJI_DATA = [
       { word: "過程", meaning: "かてい", points: 1 },
       { word: "傾向", meaning: "けいこう", points: 1 },
       { word: "責任", meaning: "せきにん", points: 1 },
       { word: "資源", meaning: "しげん", points: 1 },
-      { word: "構造", meaning: "こうぞう", points: 1 },
       { word: "豊富", meaning: "ほうふ", points: 1 },
       { word: "評価", meaning: "ひょうか", points: 1 },
-      { word: "比較", meaning: "ひかく", points: 1 },
       { word: "伝統", meaning: "でんとう", points: 1 },
-      { word: "意識", meaning: "いしき", points: 1 },
-      { word: "確率", meaning: "かくりつ", points: 1 },
-      { word: "燃焼", meaning: "ねんしょう", points: 1 },
-      { word: "簡潔", meaning: "かんけつ", points: 1 },
-      { word: "対策", meaning: "たいさく", points: 1 },
-      { word: "協力", meaning: "きょうりょく", points: 1 },
-
-      // 2pt (漢検4級・中学生レベル程度)
       { word: "摩擦", meaning: "まさつ", points: 2 },
       { word: "披露", meaning: "ひろう", points: 2 },
       { word: "脅威", meaning: "きょうい", points: 2 },
       { word: "把握", meaning: "はあく", points: 2 },
       { word: "妥協", meaning: "だきょう", points: 2 },
-      { word: "均衡", meaning: "きんこう", points: 2 },
       { word: "貢献", meaning: "こうけん", points: 2 },
       { word: "錯覚", meaning: "さっかく", points: 2 },
-      { word: "執着", meaning: "しゅうちゃく", points: 2 },
-      { word: "蓄積", meaning: "ちくせき", points: 2 },
-      { word: "描写", meaning: "びょうしゃ", points: 2 },
-      { word: "喪失", meaning: "そうしつ", points: 2 },
-      { word: "促進", meaning: "そくしん", points: 2 },
-      { word: "飛躍", meaning: "ひやく", points: 2 },
-      { word: "魅力", meaning: "みりょく", points: 2 },
-
-      // 3pt (漢検3級〜準2級・標準レベル)
       { word: "顕著", meaning: "けんちょ", points: 3 },
       { word: "普遍", meaning: "ふへん", points: 3 },
       { word: "俊敏", meaning: "しゅんびん", points: 3 },
       { word: "匿名", meaning: "とくめい", points: 3 },
       { word: "逸話", meaning: "いつわ", points: 3 },
       { word: "偏見", meaning: "へんけん", points: 3 },
-      { word: "喚起", meaning: "かんき", points: 3 },
-      { word: "枯渇", meaning: "こかつ", points: 3 },
-      { word: "模倣", meaning: "もほう", points: 3 },
-      { word: "踏襲", meaning: "とうしゅう", points: 3 },
-      { word: "凡庸", meaning: "ぼんよう", points: 3 },
-      { word: "繊細", meaning: "せんさい", points: 3 },
-      { word: "軌跡", meaning: "きせき", points: 3 },
-      { word: "享受", meaning: "きょうじゅ", points: 3 },
-      { word: "怠惰", meaning: "たいだ", points: 3 },
-
-      // 4pt (漢検2級・高校卒業レベル程度)
       { word: "辛辣", meaning: "しんらつ", points: 4 },
-      { word: "遡及", meaning: "そきゅう", points: 4 },
       { word: "語彙", meaning: "ごい", points: 4 },
       { word: "曖昧", meaning: "あいまい", points: 4 },
       { word: "傲慢", meaning: "ごうまん", points: 4 },
       { word: "隠蔽", meaning: "いんぺい", points: 4 },
       { word: "凄惨", meaning: "せいさん", points: 4 },
-      { word: "払拭", meaning: "ふっしょく", points: 4 },
-      { word: "完璧", meaning: "かんぺき", points: 4 },
-      { word: "嫉妬", meaning: "しっと", points: 4 },
-      { word: "憂鬱", meaning: "ゆううつ", points: 4 },
-      { word: "挨拶", meaning: "あいさつ", points: 4 },
-      { word: "訃報", meaning: "ふほう", points: 4 },
-      { word: "破綻", meaning: "はたん", points: 4 },
-      { word: "惜別", meaning: "せきべつ", points: 4 },
-
-      // 5pt (漢検準1級〜2級難読・応用レベル)
       { word: "忖度", meaning: "そんたく", points: 5 },
       { word: "脆弱", meaning: "ぜいじゃく", points: 5 },
       { word: "蔓延", meaning: "まんえん", points: 5 },
-      { word: "辣腕", meaning: "らつわん", points: 5 },
       { word: "喧噪", meaning: "けんそう", points: 5 },
       { word: "乖離", meaning: "かいり", points: 5 },
-      { word: "牽引", meaning: "けんいん", points: 5 },
-      { word: "躊躇", meaning: "ちゅうちょ", points: 5 },
-      { word: "齟齬", meaning: "そご", points: 5 },
-      { word: "造詣", meaning: "ぞうけい", points: 5 },
-      { word: "遜色", meaning: "そんしょく", points: 5 },
-      { word: "払底", meaning: "ふってい", points: 5 },
-      { word: "邁進", meaning: "まいしん", points: 5 },
-      { word: "蹂躙", meaning: "じゅうりん", points: 5 },
-      { word: "欺瞞", meaning: "ぎまん", points: 5 }
+      { word: "躊躇", meaning: "ちゅうちょ", points: 5 }
+    ];
+
+    const DEFAULT_ENGLISH_DATA = [
+      { word: "answer", meaning: "答える", points: 1 },
+      { word: "bring", meaning: "持ってくる", points: 1 },
+      { word: "catch", meaning: "捕まえる", points: 1 },
+      { word: "draw", meaning: "描く", points: 1 },
+      { word: "fall", meaning: "落ちる", points: 1 },
+      { word: "clear", meaning: "晴れた", points: 1 },
+      { word: "remember", meaning: "思い出す", points: 2 },
+      { word: "borrow", meaning: "借りる", points: 2 },
+      { word: "collect", meaning: "集める", points: 2 },
+      { word: "follow", meaning: "従う", points: 2 },
+      { word: "invite", meaning: "招待する", points: 2 },
+      { word: "careful", meaning: "注意深い", points: 2 },
+      { word: "create", meaning: "創造する", points: 3 },
+      { word: "discuss", meaning: "議論する", points: 3 },
+      { word: "expect", meaning: "期待する", points: 3 },
+      { word: "guess", meaning: "推測する", points: 3 },
+      { word: "dangerous", meaning: "危険な", points: 3 },
+      { word: "impossible", meaning: "不可能な", points: 3 },
+      { word: "accept", meaning: "受け入れる", points: 4 },
+      { word: "compare", meaning: "比較する", points: 4 },
+      { word: "destroy", meaning: "破壊する", points: 4 },
+      { word: "express", meaning: "表現する", points: 4 },
+      { word: "expensive", meaning: "高価な", points: 4 },
+      { word: "familiar", meaning: "よく知られた", points: 4 },
+      { word: "announce", meaning: "発表する", points: 5 },
+      { word: "complain", meaning: "不平を言う", points: 5 },
+      { word: "graduate", meaning: "卒業する", points: 5 },
+      { word: "recognize", meaning: "認識する", points: 5 },
+      { word: "complicated", meaning: "複雑な", points: 5 },
+      { word: "independent", meaning: "独立した", points: 5 }
+    ];
+
+    const KANJI_LEVELS = [
+      { label: '初級 (漢検5級〜4級)', value: '漢検5級から漢検4級レベル' },
+      { label: '中級 (漢検3級〜準2級)', value: '漢検3級から漢検準2級レベル' },
+      { label: '上級 (漢検2級〜準1級)', value: '漢検2級から漢検準1級レベル' }
+    ];
+
+    const ENGLISH_LEVELS = [
+      { label: '初級 (英検4級)', value: '英検4級レベル' },
+      { label: '中級 (英検3級)', value: '英検3級レベル' },
+      { label: '上級 (英検準2級)', value: '英検準2級レベル' }
     ];
 
     const DIRECTIONS = [
@@ -248,11 +244,11 @@
       
       candidates.forEach(item => {
         let score = 0;
-        // 読み仮名の文字数が近いものを優先
+        // 読み仮名/意味の文字数が近いものを優先
         const lengthDiff = Math.abs(item.meaning.length - correctItem.meaning.length);
         score -= lengthDiff * 5; 
         
-        // 漢字の文字数が近いものを優先
+        // 単語の文字数が近いものを優先
         const wordLengthDiff = Math.abs(item.word.length - correctItem.word.length);
         score -= wordLengthDiff * 3;
         
@@ -280,19 +276,35 @@
       const [allWordsInPlay, setAllWordsInPlay] = useState([]);
       const [currentPlayer, setCurrentPlayer] = useState('black');
       
-      const [themeInput, setThemeInput] = useState("");
-      const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
-      const [currentThemeName, setCurrentThemeName] = useState("AIおまかせ");
+      // メニュー設定用
+      const [genre, setGenre] = useState('kanji'); // 'kanji' | 'english'
+      const [level, setLevel] = useState(KANJI_LEVELS[0].value);
+      const [currentGenre, setCurrentGenre] = useState('kanji'); // プレイ中のジャンル
+      const [currentThemeName, setCurrentThemeName] = useState("");
 
+      const [themeInput, setThemeInput] = useState(""); // 追加: 自由入力用の状態変数を定義
+      const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
       const [quizModal, setQuizModal] = useState(null); 
       const [toastMessage, setToastMessage] = useState("");
 
-      const initializeBoard = (wordDataList) => {
+      // ジャンル変更時にレベルの選択肢をリセット
+      useEffect(() => {
+        if (genre === 'kanji') {
+          setLevel(KANJI_LEVELS[0].value);
+        } else {
+          setLevel(ENGLISH_LEVELS[0].value);
+        }
+        setThemeInput(""); // ジャンル変更時は自由入力もリセット
+      }, [genre]);
+
+      const initializeBoard = (wordDataList, targetGenre) => {
         setPlayMode(menuMode);
+        setCurrentGenre(targetGenre);
         
+        const fallbackData = targetGenre === 'kanji' ? DEFAULT_KANJI_DATA : DEFAULT_ENGLISH_DATA;
         let shuffledData = [...wordDataList].sort(() => Math.random() - 0.5);
         while (shuffledData.length < 64) {
-          shuffledData = [...shuffledData, ...DEFAULT_WORD_DATA].sort(() => Math.random() - 0.5);
+          shuffledData = [...shuffledData, ...fallbackData].sort(() => Math.random() - 0.5);
         }
         shuffledData = shuffledData.slice(0, 64);
         setAllWordsInPlay(shuffledData);
@@ -319,15 +331,16 @@
       const handleStart = async () => {
         setIsGeneratingTheme(true);
         try {
-          const words = await generateThemeWords(themeInput);
-          const displayTheme = themeInput.trim() ? themeInput : "AIおまかせ (ランダム)";
-          setCurrentThemeName(`✨ ${displayTheme}`);
-          initializeBoard(words);
+          const words = await generateThemeWords(genre, level, themeInput);
+          const isCustom = themeInput.trim().length > 0;
+          const levelLabel = isCustom ? themeInput.trim() : (genre === 'kanji' ? KANJI_LEVELS : ENGLISH_LEVELS).find(l => l.value === level).label;
+          setCurrentThemeName(`✨ ${genre === 'kanji' ? '漢字' : '英単語'} - ${levelLabel}`);
+          initializeBoard(words, genre);
         } catch (error) {
           console.error(error);
           alert("AIの生成に失敗しました。予備の標準データで開始します。");
-          setCurrentThemeName("標準 (AI生成失敗)");
-          initializeBoard(DEFAULT_WORD_DATA);
+          setCurrentThemeName(`標準データ (${genre === 'kanji' ? '漢字' : '英単語'})`);
+          initializeBoard(genre === 'kanji' ? DEFAULT_KANJI_DATA : DEFAULT_ENGLISH_DATA, genre);
         } finally {
           setIsGeneratingTheme(false);
         }
@@ -433,49 +446,77 @@
         return (
           <div className="min-h-screen bg-stone-100 flex flex-col items-center justify-center p-4 font-sans text-stone-800">
             <div className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full border-4 border-stone-600">
-              <h1 className="text-4xl font-black text-center text-stone-900 mb-2">漢字リバーシ</h1>
-              <p className="text-center text-stone-600 font-bold mb-8">遊びながら漢字力を高めよう！</p>
+              <h1 className="text-4xl font-black text-center text-stone-900 mb-2">学習リバーシ</h1>
+              <p className="text-center text-stone-600 font-bold mb-8">遊びながら知識を高めよう！</p>
               
               <div className="mb-6 flex justify-center gap-4 bg-stone-100 p-3 rounded-lg border-2 border-stone-300">
                 <label className="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
-                    name="mode" 
-                    value="cpu" 
-                    checked={menuMode === 'cpu'}
-                    onChange={() => setMenuMode('cpu')}
+                    type="radio" name="mode" value="cpu" checked={menuMode === 'cpu'} onChange={() => setMenuMode('cpu')}
                     className="mr-2 w-5 h-5 text-amber-600 focus:ring-amber-500"
                   />
                   <span className="font-bold text-stone-800 text-sm">1人で遊ぶ (vs CPU)</span>
                 </label>
                 <label className="flex items-center cursor-pointer">
                   <input 
-                    type="radio" 
-                    name="mode" 
-                    value="pvp" 
-                    checked={menuMode === 'pvp'}
-                    onChange={() => setMenuMode('pvp')}
+                    type="radio" name="mode" value="pvp" checked={menuMode === 'pvp'} onChange={() => setMenuMode('pvp')}
                     className="mr-2 w-5 h-5 text-amber-600 focus:ring-amber-500"
                   />
                   <span className="font-bold text-stone-800 text-sm">2人で遊ぶ (対人戦)</span>
                 </label>
               </div>
 
-              <div className="bg-stone-50 p-6 rounded-2xl border-2 border-stone-200">
-                <h2 className="text-lg font-bold text-stone-800 mb-2 flex items-center justify-center gap-2">
+              <div className="bg-stone-50 p-6 rounded-2xl border-2 border-stone-200 mb-4">
+                <h2 className="text-lg font-bold text-stone-800 mb-4 flex items-center justify-center gap-2">
                   <span className="text-2xl">✨</span> AI問題生成
                 </h2>
-                <p className="text-sm text-stone-600 mb-4 text-center">
-                  テーマを入力すると、毎回AIが新しい漢字問題を作ります。<br/>(空欄の場合はランダムなテーマになります)
-                </p>
-                <input 
-                  type="text" 
-                  value={themeInput}
-                  onChange={(e) => setThemeInput(e.target.value)}
-                  placeholder="例: 四字熟語、魚の名前、地名..."
-                  className="w-full p-3 rounded-lg border-2 border-stone-300 focus:outline-none focus:border-stone-500 mb-4 text-center font-bold"
-                  disabled={isGeneratingTheme}
-                />
+                
+                <div className="mb-6">
+                  <p className="font-bold text-stone-600 text-sm mb-2 text-center">ジャンルを選択</p>
+                  <div className="flex justify-center gap-6">
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" value="kanji" checked={genre === 'kanji'} onChange={() => setGenre('kanji')}
+                        className="mr-2 w-4 h-4 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="font-bold text-stone-800">漢字</span>
+                    </label>
+                    <label className="flex items-center cursor-pointer">
+                      <input 
+                        type="radio" value="english" checked={genre === 'english'} onChange={() => setGenre('english')}
+                        className="mr-2 w-4 h-4 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="font-bold text-stone-800">英単語</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <p className="font-bold text-stone-600 text-sm mb-2 text-center">レベル・テーマを選択</p>
+                  <div className="flex flex-col gap-2 items-center">
+                    {(genre === 'kanji' ? KANJI_LEVELS : ENGLISH_LEVELS).map(lvl => (
+                      <label key={lvl.value} className={`flex items-center cursor-pointer w-full max-w-[240px] p-2 rounded-lg border transition-colors ${!themeInput.trim() && level === lvl.value ? 'bg-amber-50 border-amber-400' : 'bg-white border-stone-300 hover:bg-stone-100'}`}>
+                        <input 
+                          type="radio" value={lvl.value} checked={!themeInput.trim() && level === lvl.value} onChange={(e) => {setLevel(e.target.value); setThemeInput("");}}
+                          className="mr-2 w-4 h-4 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="font-bold text-stone-700 text-sm">{lvl.label}</span>
+                      </label>
+                    ))}
+                    
+                    <div className="w-full max-w-[240px] mt-2">
+                      <input 
+                        type="text" 
+                        value={themeInput}
+                        onChange={(e) => setThemeInput(e.target.value)}
+                        placeholder={genre === 'kanji' ? "自由入力 (例: 動物, 四字熟語)" : "自由入力 (例: IT, 宇宙)"}
+                        className={`w-full p-2 pl-3 text-sm font-bold text-stone-700 rounded-lg border-2 focus:outline-none transition-colors ${themeInput.trim() ? 'bg-amber-50 border-amber-400' : 'bg-white border-stone-300 focus:border-amber-400'}`}
+                        disabled={isGeneratingTheme}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <button 
                   onClick={handleStart}
                   disabled={isGeneratingTheme}
@@ -484,7 +525,7 @@
                   {isGeneratingTheme ? (
                     <>
                       <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                      問題を生成中...
+                      盤面を生成中...
                     </>
                   ) : "ゲーム開始！"}
                 </button>
@@ -506,10 +547,10 @@
               ← メニュー
             </button>
             <h1 className="text-2xl font-black text-center text-stone-900 mb-1 mt-2 tracking-wider">
-              漢字リバーシ
+              学習リバーシ
             </h1>
             <p className="text-center text-xs text-stone-600 font-bold mb-4">
-              テーマ: {currentThemeName}
+              {currentThemeName}
             </p>
             
             <div className="flex justify-between items-center px-4">
@@ -535,7 +576,7 @@
           </div>
 
           {toastMessage && (
-            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-stone-800 text-white px-6 py-3 rounded-full shadow-lg font-bold text-sm sm:text-base animate-bounce">
+            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-stone-800 text-white px-6 py-3 rounded-full shadow-lg font-bold text-sm sm:text-base animate-bounce w-max max-w-[90vw]">
               {toastMessage}
             </div>
           )}
@@ -561,7 +602,7 @@
                           <div className="absolute top-0.5 text-[8px] sm:text-[10px] text-amber-100 font-bold opacity-80">
                             {cell.points}pt
                           </div>
-                          <div className="text-[10px] sm:text-xs font-bold text-white text-center leading-tight truncate w-full px-0.5" style={{ textShadow: "1px 1px 1px rgba(0,0,0,0.4)" }}>
+                          <div className="text-[9px] sm:text-[11px] font-bold text-white text-center leading-tight truncate w-full px-0.5 break-words" style={{ textShadow: "1px 1px 1px rgba(0,0,0,0.4)" }}>
                             {cell.word}
                           </div>
                           {isValid && (
@@ -594,8 +635,10 @@
                   <span className="inline-block bg-stone-200 text-stone-800 text-xs font-bold px-3 py-1 rounded-full mb-2">
                     正解で {quizModal.wordObj.points}pt 獲得
                   </span>
-                  <h2 className="text-stone-600 text-sm font-bold mb-1">この漢字の読み方は？</h2>
-                  <div className="text-4xl font-black text-stone-900 break-words">{quizModal.wordObj.word}</div>
+                  <h2 className="text-stone-600 text-sm font-bold mb-1">
+                    {currentGenre === 'kanji' ? 'この漢字の読み方は？' : 'この英単語の意味は？'}
+                  </h2>
+                  <div className="text-3xl sm:text-4xl font-black text-stone-900 break-words">{quizModal.wordObj.word}</div>
                 </div>
                 
                 <div className="flex flex-col gap-3">
