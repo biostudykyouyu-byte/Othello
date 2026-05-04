@@ -81,21 +81,6 @@
       return JSON.parse(data.candidates[0].content.parts[0].text);
     };
 
-    const generateWordExplanation = async (word) => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-      const prompt = `英単語「${word}」の語源や覚え方のコツ、または短い例文を、日本語で簡潔に2〜3文程度で優しく教えてください。`;
-
-      const payload = { contents: [{ parts: [{ text: prompt }] }] };
-
-      const data = await fetchWithRetry(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      return data.candidates[0].content.parts[0].text;
-    };
-
     // ==========================================
     // デフォルトデータ
     // ==========================================
@@ -280,7 +265,6 @@
       const [currentThemeName, setCurrentThemeName] = useState("標準 (英検4〜準2級)");
 
       const [quizModal, setQuizModal] = useState(null); 
-      const [explanationModal, setExplanationModal] = useState(null);
       const [toastMessage, setToastMessage] = useState("");
 
       const initializeBoard = (wordDataList) => {
@@ -310,7 +294,6 @@
         setGameState('playing');
         setToastMessage("");
         setQuizModal(null);
-        setExplanationModal(null);
       };
 
       const handleStartDefault = () => {
@@ -383,7 +366,7 @@
       }, [toastMessage, gameState]);
 
       const handleCellClick = (r, c) => {
-        if (gameState !== 'playing' || quizModal || explanationModal) return;
+        if (gameState !== 'playing' || quizModal) return;
         // CPUのターン中はクリックを無視する
         if (playMode === 'cpu' && currentPlayer === 'white') return;
 
@@ -395,37 +378,24 @@
         }
       };
 
-      const handleQuizAnswer = async (selectedMeaning) => {
+      const handleQuizAnswer = (selectedMeaning) => {
         const { r, c, wordObj, flippable } = quizModal;
         const opponent = currentPlayer === 'black' ? 'white' : 'black';
-        const isCorrect = selectedMeaning === wordObj.meaning;
+
+        if (selectedMeaning === wordObj.meaning) {
+          const newBoard = board.map(row => [...row]);
+          newBoard[r][c].owner = currentPlayer;
+          flippable.forEach(({ r: fr, c: fc }) => {
+            newBoard[fr][fc].owner = currentPlayer;
+          });
+          setBoard(newBoard);
+          setToastMessage("⭕️ 正解！石を置きました。");
+        } else {
+          setToastMessage(`❌ 不正解... ペナルティで相手のターンになります。正解は「${wordObj.meaning}」でした。`);
+        }
 
         setQuizModal(null);
-        setExplanationModal({
-          isCorrect,
-          wordObj,
-          text: null,
-          isLoading: true,
-          nextAction: () => {
-            if (isCorrect) {
-              const newBoard = board.map(row => [...row]);
-              newBoard[r][c].owner = currentPlayer;
-              flippable.forEach(({ r: fr, c: fc }) => {
-                newBoard[fr][fc].owner = currentPlayer;
-              });
-              setBoard(newBoard);
-            }
-            setExplanationModal(null);
-            setCurrentPlayer(opponent);
-          }
-        });
-
-        try {
-          const explanation = await generateWordExplanation(wordObj.word);
-          setExplanationModal(prev => prev ? { ...prev, text: explanation, isLoading: false } : null);
-        } catch (error) {
-          setExplanationModal(prev => prev ? { ...prev, text: "解説の生成に失敗しました。", isLoading: false } : null);
-        }
+        setCurrentPlayer(opponent);
       };
 
       const scores = useMemo(() => {
@@ -630,48 +600,6 @@
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          )}
-
-          {explanationModal && (
-            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-              <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl border-4 border-teal-500 relative">
-                <div className="text-center mb-4">
-                  <div className={`text-3xl font-black mb-2 ${explanationModal.isCorrect ? "text-emerald-500" : "text-red-500"}`}>
-                    {explanationModal.isCorrect ? "⭕️ 正解！" : "❌ 不正解..."}
-                  </div>
-                  <div className="text-xl font-bold text-gray-800">
-                    {explanationModal.wordObj.word} = {explanationModal.wordObj.meaning}
-                  </div>
-                  {!explanationModal.isCorrect && (
-                    <div className="text-sm text-red-500 font-bold mt-1">ペナルティにより相手のターンになります</div>
-                  )}
-                </div>
-
-                <div className="bg-teal-50 p-4 rounded-xl border border-teal-200 min-h-[120px] flex flex-col justify-center mb-6 relative overflow-hidden">
-                  <div className="absolute top-2 left-2 text-sm">✨</div>
-                  <div className="absolute bottom-2 right-2 text-sm">✨</div>
-                  
-                  {explanationModal.isLoading ? (
-                    <div className="flex flex-col items-center justify-center text-teal-600">
-                      <svg className="animate-spin h-6 w-6 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                      <span className="font-bold text-sm">AIが解説を作成中...</span>
-                    </div>
-                  ) : (
-                    <div className="text-gray-700 text-sm sm:text-base font-medium leading-relaxed z-10 px-4 whitespace-pre-wrap">
-                      {explanationModal.text}
-                    </div>
-                  )}
-                </div>
-
-                <button 
-                  onClick={explanationModal.nextAction}
-                  disabled={explanationModal.isLoading}
-                  className="w-full py-4 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-lg transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  次へ (盤面に戻る)
-                </button>
               </div>
             </div>
           )}
