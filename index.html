@@ -32,9 +32,13 @@
       for (let i = 0; i < retries; i++) {
         try {
           const response = await fetch(url, options);
-          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`HTTP error! status: ${response.status}, details: ${JSON.stringify(errorData)}`);
+          }
           return await response.json();
         } catch (error) {
+          console.warn(`Attempt ${i + 1} failed:`, error.message);
           if (i === retries - 1) throw error;
           await new Promise(res => setTimeout(res, delay));
           delay *= 2;
@@ -48,7 +52,7 @@
       const meaningDesc = genre === 'kanji' ? 'ひらがなでの読み方' : '日本語訳';
       const themeDesc = customTheme && customTheme.trim() ? `「${customTheme.trim()}」に関連する` : `難易度が「${level}」の`;
       
-      const prompt = `テーマ: ${themeDesc}${itemType}をちょうど64個生成してください。
+      const prompt = `テーマ: ${themeDesc}${itemType}をできるだけ多く（最大64個）生成してください。
 難易度に応じて1から5のポイントを付けてください（1:簡単〜5:難しい）。
 出力は "words" というキーを持つJSONオブジェクトとし、その中に配列として以下のプロパティを持つ要素を含めてください:
 - word (${itemType})
@@ -59,6 +63,7 @@
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
+          maxOutputTokens: 8192,
           responseSchema: {
             type: "OBJECT",
             properties: {
@@ -86,8 +91,13 @@
         body: JSON.stringify(payload)
       });
 
-      const parsedData = JSON.parse(data.candidates[0].content.parts[0].text);
-      return parsedData.words; // 配列部分を返す
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) {
+        throw new Error("AIからの応答が空でした。");
+      }
+      
+      const parsedData = JSON.parse(text);
+      return parsedData.words || []; // 配列部分を返す（空の場合は空配列）
     };
 
     // ==========================================
@@ -303,6 +313,8 @@
         
         const fallbackData = targetGenre === 'kanji' ? DEFAULT_KANJI_DATA : DEFAULT_ENGLISH_DATA;
         let shuffledData = [...wordDataList].sort(() => Math.random() - 0.5);
+        
+        // 足りない分はフォールバックデータから補充
         while (shuffledData.length < 64) {
           shuffledData = [...shuffledData, ...fallbackData].sort(() => Math.random() - 0.5);
         }
@@ -337,7 +349,7 @@
           setCurrentThemeName(`✨ ${genre === 'kanji' ? '漢字' : '英単語'} - ${levelLabel}`);
           initializeBoard(words, genre);
         } catch (error) {
-          console.error(error);
+          console.error("Theme generation error:", error);
           alert("AIの生成に失敗しました。予備の標準データで開始します。");
           setCurrentThemeName(`標準データ (${genre === 'kanji' ? '漢字' : '英単語'})`);
           initializeBoard(genre === 'kanji' ? DEFAULT_KANJI_DATA : DEFAULT_ENGLISH_DATA, genre);
