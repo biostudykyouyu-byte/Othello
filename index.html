@@ -221,6 +221,28 @@
       return false;
     }
 
+    // CPUの最強の手を計算（獲得ポイント合計が最も高い手を選ぶ）
+    function getBestMove(board, player) {
+      let bestMove = null;
+      let maxPoints = -1;
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const flippable = getFlippableDisks(board, r, c, player);
+          if (flippable.length > 0) {
+            let points = board[r][c].points;
+            for(let disk of flippable) {
+               points += board[disk.r][disk.c].points;
+            }
+            if (points > maxPoints) {
+              maxPoints = points;
+              bestMove = { r, c, flippable };
+            }
+          }
+        }
+      }
+      return bestMove;
+    }
+
     function generateOptions(correctItem, allCurrentWords) {
       let candidates = allCurrentWords.filter(item => item.word !== correctItem.word);
       
@@ -246,6 +268,9 @@
     // ==========================================
     function App() {
       const [gameState, setGameState] = useState('menu');
+      const [menuMode, setMenuMode] = useState('cpu'); // メニューで選択中のモード: 'cpu' | 'pvp'
+      const [playMode, setPlayMode] = useState('cpu'); // ゲーム実行中のモード
+      
       const [board, setBoard] = useState([]);
       const [allWordsInPlay, setAllWordsInPlay] = useState([]);
       const [currentPlayer, setCurrentPlayer] = useState('black');
@@ -259,6 +284,8 @@
       const [toastMessage, setToastMessage] = useState("");
 
       const initializeBoard = (wordDataList) => {
+        setPlayMode(menuMode); // 選択されたモードを適用
+        
         let shuffledData = [...wordDataList].sort(() => Math.random() - 0.5);
         while (shuffledData.length < 64) {
           shuffledData = [...shuffledData, ...DEFAULT_WORD_DATA].sort(() => Math.random() - 0.5);
@@ -315,16 +342,38 @@
             setGameState('gameover');
             setToastMessage("両プレイヤーとも置ける場所がありません。ゲーム終了！");
           } else {
-            setToastMessage(`${currentPlayer === 'black' ? '黒(1P)' : '白(2P)'}は置ける場所がないためパスしました。`);
+            const playerStr = currentPlayer === 'black' ? '黒(1P)' : (playMode === 'cpu' ? '白(CPU)' : '白(2P)');
+            setToastMessage(`${playerStr}は置ける場所がないためパスしました。`);
             setCurrentPlayer(opponent);
           }
+          return;
         } else {
           const isFull = board.every(row => row.every(cell => cell.owner !== null));
           if (isFull) {
             setGameState('gameover');
+            return;
           }
         }
-      }, [board, currentPlayer, gameState]);
+
+        // --- CPUのターン処理 ---
+        if (playMode === 'cpu' && currentPlayer === 'white') {
+          const timer = setTimeout(() => {
+            const move = getBestMove(board, 'white');
+            if (move) {
+              const { r, c, flippable } = move;
+              const newBoard = board.map(row => [...row]);
+              newBoard[r][c].owner = 'white';
+              flippable.forEach(({ r: fr, c: fc }) => {
+                newBoard[fr][fc].owner = 'white';
+              });
+              setBoard(newBoard);
+              setToastMessage(`CPUが「${board[r][c].word}」に置きました`);
+              setCurrentPlayer('black');
+            }
+          }, 1500); // 1.5秒考えてから打つ
+          return () => clearTimeout(timer);
+        }
+      }, [board, currentPlayer, gameState, playMode]);
 
       useEffect(() => {
         if (toastMessage && gameState !== 'gameover') {
@@ -335,6 +384,8 @@
 
       const handleCellClick = (r, c) => {
         if (gameState !== 'playing' || quizModal || explanationModal) return;
+        // CPUのターン中はクリックを無視する
+        if (playMode === 'cpu' && currentPlayer === 'white') return;
 
         const flippable = getFlippableDisks(board, r, c, currentPlayer);
         if (flippable.length > 0) {
@@ -399,11 +450,36 @@
               <h1 className="text-4xl font-black text-center text-teal-800 mb-2">英単語リバーシ</h1>
               <p className="text-center text-teal-600 font-bold mb-8">遊びながら語彙力を高めよう！</p>
               
+              <div className="mb-6 flex justify-center gap-4 bg-teal-50 p-3 rounded-lg border-2 border-teal-200">
+                <label className="flex items-center cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="mode" 
+                    value="cpu" 
+                    checked={menuMode === 'cpu'}
+                    onChange={() => setMenuMode('cpu')}
+                    className="mr-2 w-5 h-5 text-teal-600 focus:ring-teal-500"
+                  />
+                  <span className="font-bold text-teal-800 text-sm">1人で遊ぶ (vs CPU)</span>
+                </label>
+                <label className="flex items-center cursor-pointer">
+                  <input 
+                    type="radio" 
+                    name="mode" 
+                    value="pvp" 
+                    checked={menuMode === 'pvp'}
+                    onChange={() => setMenuMode('pvp')}
+                    className="mr-2 w-5 h-5 text-teal-600 focus:ring-teal-500"
+                  />
+                  <span className="font-bold text-teal-800 text-sm">2人で遊ぶ (対人戦)</span>
+                </label>
+              </div>
+
               <button 
                 onClick={handleStartDefault}
                 className="w-full py-4 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-lg transition-colors shadow-md mb-8"
               >
-                標準モードで遊ぶ<br/><span className="text-sm font-normal">(英検4級〜準2級レベル)</span>
+                標準モードで開始<br/><span className="text-sm font-normal">(英検4級〜準2級レベル)</span>
               </button>
 
               <div className="bg-teal-50 p-6 rounded-2xl border-2 border-teal-200">
@@ -468,13 +544,14 @@
 
               <div className={`flex flex-col items-center p-2 rounded-lg ${currentPlayer === 'white' ? 'bg-teal-100 ring-2 ring-teal-500' : ''}`}>
                 <div className="w-6 h-6 rounded-full bg-white border-2 border-gray-400 mb-1"></div>
-                <span className="font-bold text-lg">白 (2P)</span>
+                <span className="font-bold text-lg">{playMode === 'cpu' ? '白 (CPU)' : '白 (2P)'}</span>
                 <span className="text-2xl font-black text-teal-700">{scores.white} <span className="text-sm">pt</span></span>
               </div>
             </div>
 
             <div className="text-center mt-3 font-semibold text-teal-700">
-              {gameState === 'gameover' ? "ゲーム終了！" : `現在のターン: ${currentPlayer === 'black' ? '黒' : '白'}`}
+              {gameState === 'gameover' ? "ゲーム終了！" : 
+                (playMode === 'cpu' && currentPlayer === 'white' ? "CPUが考え中..." : `現在のターン: ${currentPlayer === 'black' ? '黒' : '白'}`)}
             </div>
           </div>
 
@@ -489,7 +566,7 @@
               {board.map((row, r) => 
                 row.map((cell, c) => {
                   const flippable = getFlippableDisks(board, r, c, currentPlayer);
-                  const isValid = flippable.length > 0;
+                  const isValid = flippable.length > 0 && !(playMode === 'cpu' && currentPlayer === 'white');
 
                   return (
                     <div 
@@ -611,14 +688,14 @@
                   </div>
                   <div className="text-2xl font-bold text-gray-300">-</div>
                   <div className="text-center">
-                    <div className="text-gray-500 font-bold mb-1">白 (2P)</div>
+                    <div className="text-gray-500 font-bold mb-1">{playMode === 'cpu' ? '白 (CPU)' : '白 (2P)'}</div>
                     <div className="text-3xl font-black">{scores.white}</div>
                   </div>
                 </div>
 
                 <div className="text-2xl font-black text-gray-800 mb-8">
                   {scores.black > scores.white && "🎉 黒 (1P) の勝利！"}
-                  {scores.white > scores.black && "🎉 白 (2P) の勝利！"}
+                  {scores.white > scores.black && `🎉 ${playMode === 'cpu' ? '白 (CPU)' : '白 (2P)'} の勝利！`}
                   {scores.black === scores.white && "🤝 引き分け！"}
                 </div>
 
