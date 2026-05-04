@@ -392,10 +392,9 @@
       return false;
     }
 
-    // CPUの最強の手を計算（獲得ポイント合計が最も高い手を選ぶ）
-    function getBestMove(board, player) {
-      let bestMove = null;
-      let maxPoints = -1;
+    // CPUの手を計算（難易度に応じて選ぶ手を変える）
+    function getCpuMove(board, player, level) {
+      let validMoves = [];
       for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
           const flippable = getFlippableDisks(board, r, c, player);
@@ -404,14 +403,31 @@
             for(let disk of flippable) {
                points += board[disk.r][disk.c].points;
             }
-            if (points > maxPoints) {
-              maxPoints = points;
-              bestMove = { r, c, flippable };
-            }
+            validMoves.push({ r, c, flippable, points });
           }
         }
       }
-      return bestMove;
+
+      if (validMoves.length === 0) return null;
+
+      if (level === 'easy') {
+        // 完全ランダム
+        const randomIndex = Math.floor(Math.random() * validMoves.length);
+        return validMoves[randomIndex];
+      } else if (level === 'normal') {
+        // 獲得ポイント上位半分からランダム
+        validMoves.sort((a, b) => b.points - a.points);
+        const half = Math.max(1, Math.ceil(validMoves.length / 2));
+        const randomIndex = Math.floor(Math.random() * half);
+        return validMoves[randomIndex];
+      } else {
+        // 'hard' 常に最大ポイントの手（複数あればランダム）
+        validMoves.sort((a, b) => b.points - a.points);
+        const maxPoints = validMoves[0].points;
+        const bestMoves = validMoves.filter(m => m.points === maxPoints);
+        const randomIndex = Math.floor(Math.random() * bestMoves.length);
+        return bestMoves[randomIndex];
+      }
     }
 
     function generateOptions(correctItem, allCurrentWords) {
@@ -444,6 +460,8 @@
       const [gameState, setGameState] = useState('menu');
       const [menuMode, setMenuMode] = useState('cpu'); 
       const [playMode, setPlayMode] = useState('cpu'); 
+      const [cpuLevel, setCpuLevel] = useState('normal'); // メニューで選択中のCPUレベル
+      const [activeCpuLevel, setActiveCpuLevel] = useState('normal'); // ゲーム中のCPUレベル
       
       const [board, setBoard] = useState([]);
       const [allWordsInPlay, setAllWordsInPlay] = useState([]);
@@ -483,6 +501,7 @@
 
       const initializeBoard = (wordDataList, targetGenre) => {
         setPlayMode(menuMode);
+        setActiveCpuLevel(cpuLevel);
         setCurrentGenre(targetGenre);
         
         const fallbackData = FALLBACK_DATA[targetGenre];
@@ -541,7 +560,8 @@
             setGameState('gameover');
             setToastMessage("両プレイヤーとも置ける場所がありません。ゲーム終了！");
           } else {
-            const playerStr = currentPlayer === 'black' ? '黒(1P)' : (playMode === 'cpu' ? '白(CPU)' : '白(2P)');
+            const cpuLabelStr = activeCpuLevel === 'easy' ? 'よわい' : activeCpuLevel === 'hard' ? 'つよい' : 'ふつう';
+            const playerStr = currentPlayer === 'black' ? '黒(1P)' : (playMode === 'cpu' ? `白(CPU:${cpuLabelStr})` : '白(2P)');
             setToastMessage(`${playerStr}は置ける場所がないためパスしました。`);
             setCurrentPlayer(opponent);
           }
@@ -557,7 +577,7 @@
         // --- CPUのターン処理 ---
         if (playMode === 'cpu' && currentPlayer === 'white') {
           const timer = setTimeout(() => {
-            const move = getBestMove(board, 'white');
+            const move = getCpuMove(board, 'white', activeCpuLevel);
             if (move) {
               const { r, c, flippable } = move;
               const newBoard = board.map(row => [...row]);
@@ -572,7 +592,7 @@
           }, 1500);
           return () => clearTimeout(timer);
         }
-      }, [board, currentPlayer, gameState, playMode]);
+      }, [board, currentPlayer, gameState, playMode, activeCpuLevel]);
 
       useEffect(() => {
         if (toastMessage && gameState !== 'gameover') {
@@ -628,6 +648,8 @@
       }, [board]);
 
       const quizTitle = GENRES[currentGenre]?.quizQuestion || "この問題の答えは？";
+      const cpuLabelDisplay = activeCpuLevel === 'easy' ? 'よわい' : activeCpuLevel === 'hard' ? 'つよい' : 'ふつう';
+      const player2Label = playMode === 'cpu' ? `白 (CPU:${cpuLabelDisplay})` : '白 (2P)';
 
       // メニュー画面
       if (gameState === 'menu') {
@@ -637,21 +659,43 @@
               <h1 className="text-3xl sm:text-4xl font-black text-center text-stone-900 mb-2">学習リバーシ</h1>
               <p className="text-center text-stone-600 font-bold mb-6">遊びながら知識を高めよう！</p>
               
-              <div className="mb-6 flex justify-center gap-4 bg-stone-100 p-3 rounded-lg border-2 border-stone-300">
-                <label className="flex items-center cursor-pointer">
-                  <input 
-                    type="radio" name="mode" value="cpu" checked={menuMode === 'cpu'} onChange={() => setMenuMode('cpu')}
-                    className="mr-2 w-5 h-5 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="font-bold text-stone-800 text-sm">1人で遊ぶ (vs CPU)</span>
-                </label>
-                <label className="flex items-center cursor-pointer">
-                  <input 
-                    type="radio" name="mode" value="pvp" checked={menuMode === 'pvp'} onChange={() => setMenuMode('pvp')}
-                    className="mr-2 w-5 h-5 text-amber-600 focus:ring-amber-500"
-                  />
-                  <span className="font-bold text-stone-800 text-sm">2人で遊ぶ (対人戦)</span>
-                </label>
+              <div className="mb-6 flex flex-col gap-4 bg-stone-100 p-3 rounded-lg border-2 border-stone-300">
+                <div className="flex justify-center gap-4">
+                  <label className="flex items-center cursor-pointer">
+                    <input 
+                      type="radio" name="mode" value="cpu" checked={menuMode === 'cpu'} onChange={() => setMenuMode('cpu')}
+                      className="mr-2 w-5 h-5 text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="font-bold text-stone-800 text-sm">1人で遊ぶ (vs CPU)</span>
+                  </label>
+                  <label className="flex items-center cursor-pointer">
+                    <input 
+                      type="radio" name="mode" value="pvp" checked={menuMode === 'pvp'} onChange={() => setMenuMode('pvp')}
+                      className="mr-2 w-5 h-5 text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="font-bold text-stone-800 text-sm">2人で遊ぶ (対人戦)</span>
+                  </label>
+                </div>
+                
+                {menuMode === 'cpu' && (
+                  <div className="pt-3 border-t-2 border-stone-200">
+                    <p className="font-bold text-stone-600 text-sm mb-2 text-center">CPUの強さ</p>
+                    <div className="flex justify-center gap-6">
+                      <label className="flex items-center cursor-pointer">
+                        <input type="radio" value="easy" checked={cpuLevel === 'easy'} onChange={() => setCpuLevel('easy')} className="mr-1.5 w-4 h-4 text-amber-600" />
+                        <span className="font-bold text-stone-800 text-sm">よわい</span>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input type="radio" value="normal" checked={cpuLevel === 'normal'} onChange={() => setCpuLevel('normal')} className="mr-1.5 w-4 h-4 text-amber-600" />
+                        <span className="font-bold text-stone-800 text-sm">ふつう</span>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                        <input type="radio" value="hard" checked={cpuLevel === 'hard'} onChange={() => setCpuLevel('hard')} className="mr-1.5 w-4 h-4 text-amber-600" />
+                        <span className="font-bold text-stone-800 text-sm">つよい</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="bg-stone-50 p-4 sm:p-6 rounded-2xl border-2 border-stone-200 mb-4">
@@ -747,7 +791,7 @@
 
               <div className={`flex flex-col items-center p-2 rounded-lg ${currentPlayer === 'white' ? 'bg-stone-200 ring-2 ring-stone-500' : ''}`}>
                 <div className="w-6 h-6 rounded-full bg-white border-2 border-stone-400 mb-1"></div>
-                <span className="font-bold text-lg">{playMode === 'cpu' ? '白 (CPU)' : '白 (2P)'}</span>
+                <span className="font-bold text-sm sm:text-base">{player2Label}</span>
                 <span className="text-2xl font-black text-stone-700">{scores.white} <span className="text-sm">pt</span></span>
               </div>
             </div>
@@ -851,14 +895,14 @@
                   </div>
                   <div className="text-2xl font-bold text-stone-300">-</div>
                   <div className="text-center">
-                    <div className="text-stone-500 font-bold mb-1">{playMode === 'cpu' ? '白 (CPU)' : '白 (2P)'}</div>
+                    <div className="text-stone-500 font-bold mb-1">{player2Label}</div>
                     <div className="text-3xl font-black">{scores.white}</div>
                   </div>
                 </div>
 
                 <div className="text-2xl font-black text-stone-800 mb-8">
                   {scores.black > scores.white && "🎉 黒 (1P) の勝利！"}
-                  {scores.white > scores.black && `🎉 ${playMode === 'cpu' ? '白 (CPU)' : '白 (2P)'} の勝利！`}
+                  {scores.white > scores.black && `🎉 ${player2Label} の勝利！`}
                   {scores.black === scores.white && "🤝 引き分け！"}
                 </div>
 
